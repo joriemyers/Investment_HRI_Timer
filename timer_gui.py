@@ -1,17 +1,19 @@
 """
 Investment_HRI_Timer
 ====================
-Participant GUI with LSL bridge + Latin Square counterbalancing.
+Participant GUI with LSL bridge + Latin Square counterbalancing + Event timing.
 
 Participants : 101–110
 Trials       : A (15 min), B (30 min), C (15 min), D (30 min)
-Flow         : Login → Baseline (2 min) → Trial 1 → Trial 2 → Trial 3 → Trial 4 → Done
+Flow         : Login → Baseline (2 min) → Trial 1 → 2 → 3 → 4 → Done
 
-Latin Square:
-  101, 105, 109 → A B D C
-  102, 106, 110 → B C A D
-  103, 107       → C D B A
-  104, 108       → D A C B
+Event buttons (trials only):
+  1. Leak Check       — records time from trial Start → this press
+  2. Visual Inspection — records time from Leak Check → this press
+  3. Stop             — records time from Visual Inspection → this press
+                        also stops the trial timer
+
+Done screen shows all event times for every trial.
 
 Dependencies:
   pip install pylsl
@@ -71,6 +73,7 @@ GREEN   = "#a6e3a1"
 RED     = "#f38ba8"
 YELLOW  = "#f9e2af"
 PURPLE  = "#cba6f7"
+ORANGE  = "#fab387"
 SUBTEXT = "#7f849c"
 WHITE   = "#ffffff"
 
@@ -82,6 +85,12 @@ TRIAL_COLORS = {"A": ACCENT, "B": GREEN, "C": YELLOW, "D": PURPLE}
 def fmt(seconds: int) -> str:
     m, s = divmod(max(0, seconds), 60)
     return f"{m:02d}:{s:02d}"
+
+def fmt_f(seconds: float) -> str:
+    """Format float seconds as MM:SS.t"""
+    m  = int(seconds) // 60
+    s  = seconds % 60
+    return f"{m:02d}:{s:05.2f}"
 
 def clear(frame):
     for w in frame.winfo_children():
@@ -96,12 +105,19 @@ class HRITimerApp(tk.Tk):
         self.title("Investment HRI — Participant Timer")
         self.configure(bg=BG)
         self.resizable(False, False)
-        self.geometry("520x580")
+        self.geometry("540x660")
 
         self.outlet      = create_lsl_outlet()
         self.pid         = None
         self.trial_order = []
         self.trial_index = -1
+
+        # Stores event times per trial:
+        # { trial_num: {"condition": "A",
+        #               "leak_check": float,
+        #               "visual_inspection": float,
+        #               "stop": float } }
+        self.event_log = {}
 
         self.container = tk.Frame(self, bg=BG)
         self.container.pack(expand=True, fill="both", padx=30, pady=20)
@@ -113,6 +129,7 @@ class HRITimerApp(tk.Tk):
 
     def _show_login(self):
         clear(self.container)
+        self.event_log = {}
 
         tk.Label(self.container, text="Investment HRI",
                  fg=ACCENT, bg=BG, font=("Segoe UI", 22, "bold")).pack(pady=(10, 2))
@@ -160,10 +177,11 @@ class HRITimerApp(tk.Tk):
         self.pid         = pid
         self.trial_order = get_trial_order(pid)
         self.trial_index = -1
+        self.event_log   = {}
         push_marker(self.outlet, f"session_start_P{pid}")
         self._show_baseline()
 
-    # ── Screen 2: Baseline ─────────────────────────────────────────────────────
+    # ── Screen 2: Baseline (no event buttons) ─────────────────────────────────
 
     def _show_baseline(self):
         self._show_timer_screen(
@@ -175,6 +193,7 @@ class HRITimerApp(tk.Tk):
             marker_pre = f"P{self.pid}_baseline",
             next_label = "Next: Trial 1  ▶",
             next_cmd   = self._advance,
+            show_events= False,
         )
 
     # ── Screens 3–6: Trials ────────────────────────────────────────────────────
@@ -185,9 +204,9 @@ class HRITimerApp(tk.Tk):
             self._show_done()
             return
 
-        t     = self.trial_order[self.trial_index]
-        step  = self.trial_index + 2
-        mins  = TRIAL_DURATIONS[t] // 60
+        t       = self.trial_order[self.trial_index]
+        step    = self.trial_index + 2
+        mins    = TRIAL_DURATIONS[t] // 60
         is_last = self.trial_index == len(self.trial_order) - 1
 
         self._show_timer_screen(
@@ -199,19 +218,28 @@ class HRITimerApp(tk.Tk):
             marker_pre = f"P{self.pid}_trial{self.trial_index + 1}_{t}",
             next_label = "Finish Session  ✔" if is_last else f"Next: Trial {self.trial_index + 2}  ▶",
             next_cmd   = self._advance,
+            show_events= True,
         )
 
     # ── Generic timer screen ───────────────────────────────────────────────────
 
     def _show_timer_screen(self, title, subtitle, info, duration,
-                           color, marker_pre, next_label, next_cmd):
+                           color, marker_pre, next_label, next_cmd,
+                           show_events=False):
         clear(self.container)
 
-        self._running    = False
-        self._elapsed    = 0
-        self._duration   = duration
-        self._stop_event = threading.Event()
-        self._marker_pre = marker_pre
+        self._running      = False
+        self._elapsed      = 0
+        self._duration     = duration
+        self._stop_event   = threading.Event()
+        self._marker_pre   = marker_pre
+        self._show_events  = show_events
+        self._trial_color  = color
+
+        # Event timing state
+        self._timer_start_wall = None   # wall-clock time.monotonic() when timer started
+        self._last_event_wall  = None   # wall-clock time of last event press
+        self._event_stage      = 0      # 0=none, 1=leak done, 2=visual done, 3=stop done
 
         # Header
         tk.Label(self.container, text=title,
@@ -221,45 +249,136 @@ class HRITimerApp(tk.Tk):
         tk.Label(self.container, text=info,
                  fg=WHITE, bg=BG, font=("Segoe UI", 10, "italic")).pack(pady=(2, 4))
 
-        tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=8)
+        tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=6)
 
         # Clock
         self._clock_var = tk.StringVar(value=fmt(duration))
-        tk.Label(self.container, textvariable=self._clock_var,
-                 fg=WHITE, bg=BG, font=("Courier New", 58, "bold")).pack(pady=(8, 4))
+        self._clock_lbl = tk.Label(self.container, textvariable=self._clock_var,
+                                   fg=WHITE, bg=BG, font=("Courier New", 52, "bold"))
+        self._clock_lbl.pack(pady=(6, 2))
+        self._warned = False
 
         # Progress bar
         self._prog = tk.Canvas(self.container, height=10, bg=BG, highlightthickness=0)
         self._prog.pack(fill="x", padx=10, pady=(0, 4))
         self._prog.update_idletasks()
-        pw = self._prog.winfo_width() or 460
+        pw = self._prog.winfo_width() or 480
         self._prog.create_rectangle(0, 0, pw, 10, fill=PANEL, outline="", tags="bg")
         self._prog.create_rectangle(0, 0, 0, 10, fill=color, outline="", tags="bar")
 
         # Status
         self._status_var = tk.StringVar(value="Press Start when ready.")
         tk.Label(self.container, textvariable=self._status_var,
-                 fg=SUBTEXT, bg=BG, font=("Segoe UI", 10, "italic")).pack(pady=(2, 8))
+                 fg=SUBTEXT, bg=BG, font=("Segoe UI", 10, "italic")).pack(pady=(2, 6))
 
-        # Timer buttons
+        # Timer control buttons (Start / Reset only — Stop is an event button for trials)
         btn_row = tk.Frame(self.container, bg=BG)
         btn_row.pack()
 
         self._start_btn = self._btn(btn_row, "▶  Start", color, self._start_timer)
         self._start_btn.grid(row=0, column=0, padx=8)
 
-        self._stop_btn = self._btn(btn_row, "■  Stop", RED, self._stop_timer, state="disabled")
-        self._stop_btn.grid(row=0, column=1, padx=8)
+        if not show_events:
+            # Baseline: show a normal Stop button
+            self._stop_btn = self._btn(btn_row, "■  Stop", RED, self._stop_timer, state="disabled")
+            self._stop_btn.grid(row=0, column=1, padx=8)
 
         self._reset_btn = self._btn(btn_row, "↺  Reset", SUBTEXT, self._reset_timer)
-        self._reset_btn.grid(row=0, column=2, padx=8)
+        self._reset_btn.grid(row=0, column=2 if not show_events else 1, padx=8)
 
-        tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=12)
+        # ── Event buttons (trials only) ────────────────────────────────────────
+        if show_events:
+            tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=8)
+            tk.Label(self.container, text="Event Markers",
+                     fg=SUBTEXT, bg=BG, font=("Segoe UI", 10, "bold")).pack()
 
-        # Next button — locked until timer finishes or is stopped
+            ev_frame = tk.Frame(self.container, bg=BG)
+            ev_frame.pack(pady=6)
+
+            self._leak_btn = self._btn(ev_frame, "🔍  Leak Check", ORANGE,
+                                       self._event_leak, state="disabled")
+            self._leak_btn.grid(row=0, column=0, padx=6, ipady=5, ipadx=4)
+
+            self._visual_btn = self._btn(ev_frame, "👁  Visual Inspection", PURPLE,
+                                         self._event_visual, state="disabled")
+            self._visual_btn.grid(row=0, column=1, padx=6, ipady=5, ipadx=4)
+
+            self._event_stop_btn = self._btn(ev_frame, "■  Stop", RED,
+                                             self._event_stop, state="disabled")
+            self._event_stop_btn.grid(row=0, column=2, padx=6, ipady=5, ipadx=4)
+
+            # Live event time display
+            self._ev_log_var = tk.StringVar(value="")
+            tk.Label(self.container, textvariable=self._ev_log_var,
+                     fg=GREEN, bg=BG, font=("Courier New", 10),
+                     justify="left").pack(pady=(4, 0))
+
+        tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=8)
+
+        # Next button
         self._next_btn = self._btn(self.container, next_label, PANEL,
                                    next_cmd, state="disabled", fg=SUBTEXT)
         self._next_btn.pack(ipadx=14, ipady=7)
+
+    # ── Event button handlers ──────────────────────────────────────────────────
+
+    def _event_leak(self):
+        now      = time.monotonic()
+        elapsed  = now - self._timer_start_wall
+        self._last_event_wall = now
+        self._event_stage = 1
+
+        trial_num = self.trial_index + 1
+        cond      = self.trial_order[self.trial_index]
+        if trial_num not in self.event_log:
+            self.event_log[trial_num] = {"condition": cond}
+        self.event_log[trial_num]["leak_check"] = elapsed
+
+        push_marker(self.outlet, f"{self._marker_pre}_leak_check")
+        self._leak_btn.config(state="disabled", bg=SUBTEXT)
+        self._visual_btn.config(state="normal")
+        self._update_ev_display(trial_num)
+
+    def _event_visual(self):
+        now      = time.monotonic()
+        elapsed  = now - self._last_event_wall
+        self._last_event_wall = now
+        self._event_stage = 2
+
+        trial_num = self.trial_index + 1
+        self.event_log[trial_num]["visual_inspection"] = elapsed
+
+        push_marker(self.outlet, f"{self._marker_pre}_visual_inspection")
+        self._visual_btn.config(state="disabled", bg=SUBTEXT)
+        self._event_stop_btn.config(state="normal")
+        self._update_ev_display(trial_num)
+
+    def _event_stop(self):
+        now      = time.monotonic()
+        elapsed  = now - self._last_event_wall
+        self._event_stage = 3
+
+        trial_num = self.trial_index + 1
+        self.event_log[trial_num]["stop"] = elapsed
+
+        push_marker(self.outlet, f"{self._marker_pre}_event_stop")
+        self._event_stop_btn.config(state="disabled", bg=SUBTEXT)
+        self._update_ev_display(trial_num)
+
+        # Also stop the running timer
+        self._stop_timer_silent()
+        self._unlock_next()
+
+    def _update_ev_display(self, trial_num):
+        log  = self.event_log.get(trial_num, {})
+        lines = []
+        if "leak_check" in log:
+            lines.append(f"  Leak Check:          {fmt_f(log['leak_check'])}  (from Start)")
+        if "visual_inspection" in log:
+            lines.append(f"  Visual Inspection:   {fmt_f(log['visual_inspection'])}  (from Leak Check)")
+        if "stop" in log:
+            lines.append(f"  Stop:                {fmt_f(log['stop'])}  (from Visual Inspection)")
+        self._ev_log_var.set("\n".join(lines))
 
     # ── Timer logic ────────────────────────────────────────────────────────────
 
@@ -268,13 +387,18 @@ class HRITimerApp(tk.Tk):
             return
         self._running = True
         self._stop_event.clear()
+        self._timer_start_wall = time.monotonic()
         push_marker(self.outlet, f"{self._marker_pre}_start")
         self._start_btn.config(state="disabled")
-        self._stop_btn.config(state="normal")
+        if not self._show_events:
+            self._stop_btn.config(state="normal")
+        else:
+            self._leak_btn.config(state="normal")
         self._status_var.set("Running…")
         threading.Thread(target=self._run_timer, daemon=True).start()
 
     def _stop_timer(self):
+        """Used by baseline Stop button."""
         if not self._running:
             return
         self._running = False
@@ -285,16 +409,43 @@ class HRITimerApp(tk.Tk):
         self._status_var.set(f"Stopped at {fmt(self._elapsed)}")
         self._unlock_next()
 
+    def _stop_timer_silent(self):
+        """Stop the timer without touching event buttons (called by event Stop)."""
+        if not self._running:
+            return
+        self._running = False
+        self._stop_event.set()
+        push_marker(self.outlet, f"{self._marker_pre}_stop")
+        self._start_btn.config(state="disabled")
+        self._status_var.set(f"Stopped at {fmt(self._elapsed)}")
+
     def _reset_timer(self):
         if self._running:
-            self._stop_timer()
-        self._elapsed = 0
+            if self._show_events:
+                self._stop_timer_silent()
+            else:
+                self._stop_timer()
+        self._elapsed          = 0
+        self._warned           = False
+        self._timer_start_wall = None
+        self._last_event_wall  = None
+        self._event_stage      = 0
         self._clock_var.set(fmt(self._duration))
+        self._clock_lbl.config(fg=WHITE)
         self._prog.coords("bar", 0, 0, 0, 10)
         self._status_var.set("Press Start when ready.")
         self._start_btn.config(state="normal")
-        self._stop_btn.config(state="disabled")
         self._next_btn.config(state="disabled", bg=PANEL, fg=SUBTEXT)
+        if not self._show_events:
+            self._stop_btn.config(state="disabled")
+        else:
+            self._leak_btn.config(state="disabled", bg=ORANGE, fg=BG)
+            self._visual_btn.config(state="disabled", bg=PURPLE, fg=BG)
+            self._event_stop_btn.config(state="disabled", bg=RED, fg=BG)
+            self._ev_log_var.set("")
+            # Clear this trial's event log on reset
+            trial_num = self.trial_index + 1
+            self.event_log.pop(trial_num, None)
 
     def _run_timer(self):
         start = time.monotonic()
@@ -315,18 +466,28 @@ class HRITimerApp(tk.Tk):
     def _tick(self, remaining):
         self._clock_var.set(fmt(remaining))
         pct = self._elapsed / self._duration
-        w   = int((self._prog.winfo_width() or 460) * pct)
+        w   = int((self._prog.winfo_width() or 480) * pct)
         self._prog.coords("bar", 0, 0, w, 10)
+        if remaining <= 300 and not self._warned:
+            self._warned = True
+            self._clock_lbl.config(fg=RED)
+            push_marker(self.outlet, f"{self._marker_pre}_5min_warning")
 
     def _on_complete(self):
         self._running = False
         push_marker(self.outlet, f"{self._marker_pre}_complete")
         self._clock_var.set("00:00")
-        self._prog.coords("bar", 0, 0, self._prog.winfo_width() or 460, 10)
+        self._prog.coords("bar", 0, 0, self._prog.winfo_width() or 480, 10)
         self._status_var.set("✔  Timer complete!")
-        self._start_btn.config(state="disabled")
-        self._stop_btn.config(state="disabled")
-        self._unlock_next()
+        if not self._show_events:
+            self._start_btn.config(state="disabled")
+            self._stop_btn.config(state="disabled")
+            self._unlock_next()
+        else:
+            # Timer ran out — disable event buttons that haven't been pressed
+            self._status_var.set("⚠  Time's up! Press remaining events or Next.")
+            if self._event_stage < 3:
+                self._unlock_next()
 
     def _unlock_next(self):
         self._next_btn.config(state="normal", bg=GREEN, fg=BG,
@@ -339,26 +500,43 @@ class HRITimerApp(tk.Tk):
         push_marker(self.outlet, f"session_end_P{self.pid}")
 
         tk.Label(self.container, text="Session Complete  ✔",
-                 fg=GREEN, bg=BG, font=("Segoe UI", 20, "bold")).pack(pady=(20, 4))
+                 fg=GREEN, bg=BG, font=("Segoe UI", 20, "bold")).pack(pady=(14, 2))
         tk.Label(self.container, text=f"Participant {self.pid}",
                  fg=SUBTEXT, bg=BG, font=("Segoe UI", 12)).pack()
 
-        tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=16)
+        tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=10)
 
-        tk.Label(self.container, text="Trials completed in this order:",
-                 fg=WHITE, bg=BG, font=("Segoe UI", 11, "bold")).pack(pady=(0, 6))
+        # Event times summary
+        tk.Label(self.container, text="Event Times by Trial",
+                 fg=WHITE, bg=BG, font=("Segoe UI", 12, "bold")).pack(pady=(0, 6))
 
         for i, t in enumerate(self.trial_order):
-            mins = TRIAL_DURATIONS[t] // 60
-            tk.Label(self.container,
-                     text=f"  Trial {i+1}  —  Condition {t}  ({mins} min)",
-                     fg=TRIAL_COLORS[t], bg=BG,
-                     font=("Segoe UI", 12)).pack(pady=3)
+            trial_num = i + 1
+            color     = TRIAL_COLORS[t]
+            mins      = TRIAL_DURATIONS[t] // 60
+            log       = self.event_log.get(trial_num, {})
 
-        tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=16)
+            # Trial header
+            tk.Label(self.container,
+                     text=f"Trial {trial_num}  —  Condition {t}  ({mins} min)",
+                     fg=color, bg=BG, font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=20)
+
+            rows = [
+                ("Leak Check",         log.get("leak_check"),         "from Start"),
+                ("Visual Inspection",  log.get("visual_inspection"),  "from Leak Check"),
+                ("Stop",               log.get("stop"),               "from Visual Inspection"),
+            ]
+            for label, val, ref in rows:
+                display = fmt_f(val) if val is not None else "—"
+                tk.Label(self.container,
+                         text=f"    {label:<22} {display}   ({ref})",
+                         fg=WHITE if val is not None else SUBTEXT,
+                         bg=BG, font=("Courier New", 10)).pack(anchor="w", padx=30)
+
+            tk.Frame(self.container, bg=PANEL, height=1).pack(fill="x", padx=20, pady=4)
 
         self._btn(self.container, "Start New Participant  ▶", ACCENT,
-                  self._show_login).pack(ipadx=14, ipady=7)
+                  self._show_login).pack(ipadx=14, ipady=7, pady=(4, 0))
 
     # ── Utility ────────────────────────────────────────────────────────────────
 
