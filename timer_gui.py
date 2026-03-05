@@ -80,9 +80,9 @@ WHITE   = "#ffffff"
 # NASA-standard unbiased colors: orange, magenta, tan, light purple
 TRIAL_COLORS = {
     "A": "#FF8200",   # NASA orange
-    "B": "#00BFFF",   # deep sky blue
-    "C": "#D2B48C",   # tan
-    "D": "#C8A2C8",   # lilac / light purple
+    "B": "#1E90FF",   # dodger blue (darker)
+    "C": "#FF69B4",   # hot pink
+    "D": "#9370DB",   # medium purple (darker)
 }
 
 
