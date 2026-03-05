@@ -77,7 +77,13 @@ ORANGE  = "#fab387"
 SUBTEXT = "#7f849c"
 WHITE   = "#ffffff"
 
-TRIAL_COLORS = {"A": ACCENT, "B": GREEN, "C": YELLOW, "D": PURPLE}
+# NASA-standard unbiased colors: orange, magenta, tan, light purple
+TRIAL_COLORS = {
+    "A": "#FF8200",   # NASA orange
+    "B": "#00BFFF",   # deep sky blue
+    "C": "#D2B48C",   # tan
+    "D": "#C8A2C8",   # lilac / light purple
+}
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -499,44 +505,20 @@ class HRITimerApp(tk.Tk):
         clear(self.container)
         push_marker(self.outlet, f"session_end_P{self.pid}")
 
-        tk.Label(self.container, text="Session Complete  ✔",
-                 fg=GREEN, bg=BG, font=("Segoe UI", 20, "bold")).pack(pady=(14, 2))
+        # Spacer to vertically center content
+        tk.Frame(self.container, bg=BG, height=80).pack()
+
+        tk.Label(self.container, text="✔", fg=GREEN, bg=BG,
+                 font=("Segoe UI", 48)).pack()
+        tk.Label(self.container, text="Session Complete",
+                 fg=GREEN, bg=BG, font=("Segoe UI", 24, "bold")).pack(pady=(8, 4))
         tk.Label(self.container, text=f"Participant {self.pid}",
-                 fg=SUBTEXT, bg=BG, font=("Segoe UI", 12)).pack()
+                 fg=SUBTEXT, bg=BG, font=("Segoe UI", 13)).pack()
 
-        tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=10)
-
-        # Event times summary
-        tk.Label(self.container, text="Event Times by Trial",
-                 fg=WHITE, bg=BG, font=("Segoe UI", 12, "bold")).pack(pady=(0, 6))
-
-        for i, t in enumerate(self.trial_order):
-            trial_num = i + 1
-            color     = TRIAL_COLORS[t]
-            mins      = TRIAL_DURATIONS[t] // 60
-            log       = self.event_log.get(trial_num, {})
-
-            # Trial header
-            tk.Label(self.container,
-                     text=f"Trial {trial_num}  —  Condition {t}  ({mins} min)",
-                     fg=color, bg=BG, font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=20)
-
-            rows = [
-                ("Leak Check",         log.get("leak_check"),         "from Start"),
-                ("Visual Inspection",  log.get("visual_inspection"),  "from Leak Check"),
-                ("Stop",               log.get("stop"),               "from Visual Inspection"),
-            ]
-            for label, val, ref in rows:
-                display = fmt_f(val) if val is not None else "—"
-                tk.Label(self.container,
-                         text=f"    {label:<22} {display}   ({ref})",
-                         fg=WHITE if val is not None else SUBTEXT,
-                         bg=BG, font=("Courier New", 10)).pack(anchor="w", padx=30)
-
-            tk.Frame(self.container, bg=PANEL, height=1).pack(fill="x", padx=20, pady=4)
+        tk.Frame(self.container, bg=SUBTEXT, height=1).pack(fill="x", pady=30)
 
         self._btn(self.container, "Start New Participant  ▶", ACCENT,
-                  self._show_login).pack(ipadx=14, ipady=7, pady=(4, 0))
+                  self._show_login).pack(ipadx=14, ipady=7)
 
     # ── Utility ────────────────────────────────────────────────────────────────
 
