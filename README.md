@@ -324,15 +324,73 @@ for stream in streams:
 
 This will print every marker with its precise timestamp, which you can then align with other data streams (such as physiological recordings) for analysis.
 
-### Reading XDF files in MATLAB
+### Reading and viewing XDF files in MATLAB
 
-Download the `load_xdf` function from the [XDF MATLAB importer](https://github.com/xdf-modules/xdf-Matlab) and add it to your MATLAB path. Then run:
+This section walks through the full process of loading your XDF file in MATLAB and viewing your event markers in a readable table.
+
+#### Step 1 — Download load_xdf
+
+Download the `load_xdf.m` file from the [XDF MATLAB importer](https://github.com/xdf-modules/xdf-Matlab). On that page, click the green **Code** button and select **Download ZIP**. Extract the zip file somewhere easy to find, such as `C:\Users\YourName\Documents\xdf-Matlab`.
+
+#### Step 2 — Add load_xdf to your MATLAB path
+
+Open MATLAB and run the following, replacing the path with wherever you extracted the file:
 
 ```matlab
-streams = load_xdf('path/to/your/recording.xdf');
+addpath('C:\Users\YourName\Documents\xdf-Matlab')
 ```
 
-The `streams` cell array will contain one entry per recorded stream. Each entry has `.time_stamps` and `.time_series` fields you can work with directly.
+Confirm it worked by running:
+
+```matlab
+which load_xdf
+```
+
+This should print the full path to the `load_xdf.m` file. If it prints nothing, the path in your `addpath` command is incorrect — double check the folder location in File Explorer.
+
+#### Step 3 — Load your XDF file
+
+Use the file browser to select your XDF file without needing to type the path manually:
+
+```matlab
+[filename, pathname] = uigetfile('*.xdf', 'Select your XDF file');
+fullpath = fullfile(pathname, filename);
+streams = load_xdf(fullpath);
+disp('File loaded successfully')
+disp(length(streams))
+```
+
+A file browser window will open. Navigate to your XDF recording file (saved by LabRecorder, usually in your Documents folder), select it, and click **Open**. MATLAB will print `File loaded successfully` and the number of streams found in the file.
+
+#### Step 4 — View your markers as a table
+
+Run the following to display all event markers and their timestamps in a clean, readable table:
+
+```matlab
+% Pull out markers and timestamps from the first stream
+timestamps = streams{1}.time_stamps';
+markers    = streams{1}.time_series';
+
+% Convert to relative time starting from zero
+relative_time = timestamps - timestamps(1);
+
+% Build the table
+T = table(relative_time, timestamps, markers, ...
+    'VariableNames', {'Time_From_Start_s', 'Raw_Timestamp', 'Marker'});
+
+% Display in the command window
+disp(T)
+```
+
+This prints a table with three columns: time from the start of the session in seconds, the raw LSL timestamp, and the marker name (such as `P101_trial1_A_leak_check`).
+
+To open the table in MATLAB's interactive spreadsheet-style viewer where you can scroll through all rows, add this line:
+
+```matlab
+openvar('T')
+```
+
+This opens a separate window showing all your markers in a grid you can read and scroll through, similar to a spreadsheet.
 
 ---
 
