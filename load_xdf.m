@@ -1167,3 +1167,17 @@ streams{ mkStream }.time_series( clearMarkers ) = [];
 
 
 end
+
+% % Pull out markers and timestamps
+% timestamps = streams{1}.time_stamps';
+% markers    = streams{1}.time_series';
+% 
+% % Convert timestamps to relative time (starting from 0)
+% relative_time = timestamps - timestamps(1);
+% 
+% % Build a readable table
+% T = table(relative_time, timestamps, markers, ...
+%     'VariableNames', {'Time_From_Start_s', 'Raw_Timestamp', 'Marker'});
+% 
+% % Display it in MATLAB's table viewer
+% disp(T)
