@@ -180,7 +180,7 @@ Each condition (A, B, C, D) appears in each position (1st, 2nd, 3rd, 4th) exactl
 
 ### Balanced Latin Square
 
-The specific ordering used here is a **balanced Latin Square**, which goes one step further than a standard Latin Square. In addition to each condition appearing in each position once, a balanced Latin Square also controls for **carry-over effects** — meaning the influence that one condition may have on the next. The sequence follows a specific construction formula (positions: 1, 2, 4, 3, then each subsequent row shifts all conditions forward by one), which is the standard method used in experimental psychology to achieve carry-over balance.
+The specific ordering used here is a **balanced Latin Square**, which goes one step further than a standard Latin Square. In addition to each condition appearing in each position once, a balanced Latin Square also controls for **carry-over effects** , meaning the influence that one condition may have on the next. The sequence follows a specific construction formula (positions: 1, 2, 4, 3, then each subsequent row shifts all conditions forward by one), which is the standard method used in experimental psychology to achieve carry-over balance.
 
 ### Participant-to-row assignment
 
