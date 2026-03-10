@@ -30,7 +30,7 @@ A Python-based participant timer GUI with a Lab Streaming Layer (LSL) bridge, de
 - Trials A and C are 15 minutes; Trials B and D are 30 minutes
 - Sequential trial flow with locked Next button (cannot advance until timer completes or is stopped)
 - Clock turns red when 5 minutes remain on any timer
-- Event marker buttons during trials: Leak Check, Visual Inspection, and Stop — each recording the elapsed time from the previous event
+- Event marker buttons during trials: Leak Check, Visual Inspection, and Stop - each recording the elapsed time from the previous event
 - Session Complete screen at the end of each participant session
 - Full LSL integration streaming named string markers over the local network in real time
 
@@ -39,8 +39,8 @@ A Python-based participant timer GUI with a Lab Streaming Layer (LSL) bridge, de
 ## Requirements
 
 - Python 3.8 or higher
-- `tkinter` — included with Python on Windows by default
-- `pylsl` — the Python interface for the Lab Streaming Layer
+- `tkinter` - included with Python on Windows by default
+- `pylsl` - the Python interface for the Lab Streaming Layer
 
 ---
 
@@ -48,7 +48,7 @@ A Python-based participant timer GUI with a Lab Streaming Layer (LSL) bridge, de
 
 Follow these steps from scratch on a Windows computer.
 
-### Step 1 — Install Python
+### Step 1 - Install Python
 
 If you do not already have Python installed, download it from [python.org](https://www.python.org/downloads/). Choose the latest stable version (3.10 or higher recommended). During installation, check the box that says **"Add Python to PATH"** before clicking Install.
 
@@ -58,7 +58,7 @@ To verify the installation, open PowerShell and run:
 python --version
 ```
 
-### Step 2 — Install Git
+### Step 2 - Install Git
 
 Git is needed to push your project to GitHub. Check if it is installed by running:
 
@@ -68,7 +68,7 @@ git --version
 
 If you get an error, download and install Git from [git-scm.com](https://git-scm.com). Use all default options during installation, then close and reopen PowerShell.
 
-### Step 3 — Create your project folder
+### Step 3 - Create your project folder
 
 In PowerShell, run:
 
@@ -78,11 +78,11 @@ mkdir Investment_HRI_Timer
 cd Investment_HRI_Timer
 ```
 
-### Step 4 — Add the project files
+### Step 4 - Add the project files
 
 Copy `timer_gui.py` and `requirements.txt` into the `Investment_HRI_Timer` folder you just created. You can drag and drop them from your Downloads folder into the project folder in File Explorer.
 
-### Step 5 — Install pylsl
+### Step 5 - Install pylsl
 
 In PowerShell, from inside your project folder, run:
 
@@ -92,7 +92,7 @@ pip install pylsl
 
 This installs the Python interface for the Lab Streaming Layer, which enables the GUI to broadcast event markers over the network.
 
-### Step 6 — Create a GitHub repository
+### Step 6 - Create a GitHub repository
 
 1. Go to [github.com](https://github.com) and sign in or create a free account
 2. Click the **+** icon in the top right corner and select **New repository**
@@ -101,7 +101,7 @@ This installs the Python interface for the Lab Streaming Layer, which enables th
 5. Do **not** check "Add a README file" since one is already included
 6. Click **Create repository**
 
-### Step 7 — Push your files to GitHub
+### Step 7 - Push your files to GitHub
 
 In PowerShell, from inside your project folder:
 
@@ -114,7 +114,7 @@ git remote add origin https://github.com/YOUR_USERNAME/Investment_HRI_Timer.git
 git push -u origin main
 ```
 
-Replace `YOUR_USERNAME` with your actual GitHub username. When prompted for a password, GitHub requires a Personal Access Token — you can generate one at GitHub → Settings → Developer Settings → Personal Access Tokens.
+Replace `YOUR_USERNAME` with your actual GitHub username. When prompted for a password, GitHub requires a Personal Access Token - you can generate one at GitHub → Settings → Developer Settings → Personal Access Tokens.
 
 ---
 
@@ -134,14 +134,14 @@ The login screen will appear. Enter a participant ID between 101 and 110 and cli
 
 Each participant session follows this sequence:
 
-1. **Login** — Enter participant ID (101–110). The GUI validates the ID and automatically loads the correct Latin Square trial order for that participant.
-2. **Baseline** — A 2-minute timer runs. The experimenter clicks Start when ready. When the timer completes, the Next button unlocks.
-3. **Trial 1 through Trial 4** — Each trial screen loads automatically in the counterbalanced order for that participant. The timer duration is determined by the condition (15 min for A and C, 30 min for B and D). During each trial, three event buttons appear in sequence: Leak Check, Visual Inspection, and Stop. Each button unlocks only after the previous one has been pressed, and each records the elapsed time from the prior event.
-4. **Session Complete** — A confirmation screen appears. The experimenter can start a new participant session from this screen.
+1. **Login** - Enter participant ID (101–110). The GUI validates the ID and automatically loads the correct Latin Square trial order for that participant.
+2. **Baseline** - A 2-minute timer runs. The experimenter clicks Start when ready. When the timer completes, the Next button unlocks.
+3. **Trial 1 through Trial 4** - Each trial screen loads automatically in the counterbalanced order for that participant. The timer duration is determined by the condition (15 min for A and C, 30 min for B and D). During each trial, three event buttons appear in sequence: Leak Check, Visual Inspection, and Stop. Each button unlocks only after the previous one has been pressed, and each records the elapsed time from the prior event.
+4. **Session Complete** - A confirmation screen appears. The experimenter can start a new participant session from this screen.
 
 ---
 
-## Trial Color Coding — NASA Orion RPL Standards
+## Trial Color Coding - NASA Orion RPL Standards
 
 The four trial conditions are each assigned a distinct color in the GUI. These colors were selected in accordance with NASA's Orion Rapid Prototyping Lab (RPL) human factors display standards, which emphasize using perceptually distinct, unambiguous colors in operator interfaces to prevent confusion and reduce the risk of misinterpretation during tasks. The RPL standards call for colors that are clearly separable from one another across a range of lighting conditions and that avoid pairing colors that are commonly confused by individuals with color vision deficiencies.
 
@@ -203,17 +203,17 @@ The GUI automatically determines the correct trial order when the participant ID
 
 The Lab Streaming Layer (LSL) is an open-source software framework developed for the unified collection of time series data in research experiments. It handles networking, time synchronization, near-real-time data access, and optional centralized recording of data streams across multiple devices and applications simultaneously.
 
-LSL was built specifically for neurophysiological and behavioral research applications where precise timing is critical. It allows multiple data streams from different sources — such as EEG amplifiers, eye trackers, motion capture systems, and stimulus presentation software — to be collected simultaneously with millisecond-level synchronization, even when those devices are running on different computers and using different internal clocks.
+LSL was built specifically for neurophysiological and behavioral research applications where precise timing is critical. It allows multiple data streams from different sources, such as EEG amplifiers, eye trackers, motion capture systems, and stimulus presentation software, to be collected simultaneously with millisecond-level synchronization, even when those devices are running on different computers and using different internal clocks.
 
 ### How LSL works
 
-LSL operates on a **publish-subscribe** model over a local area network (LAN). Any application that has data to share creates an **outlet** and broadcasts it onto the network. Any application that wants to receive that data creates an **inlet** and subscribes to the stream. Streams are discovered automatically using service discovery — no manual IP address configuration is required as long as all devices are on the same network.
+LSL operates on a **publish-subscribe** model over a local area network (LAN). Any application that has data to share creates an **outlet** and broadcasts it onto the network. Any application that wants to receive that data creates an **inlet** and subscribes to the stream. Streams are discovered automatically using service discovery; no manual IP address configuration is required as long as all devices are on the same network.
 
 Each stream consists of:
 
-- **Samples** — individual measurements (in this project, string event markers)
-- **Metadata** — an XML header describing the stream name, type, number of channels, sampling rate, and data format
-- **Timestamps** — each sample is time-stamped automatically using LSL's built-in clock synchronization
+- **Samples** - individual measurements (in this project, string event markers)
+- **Metadata** - an XML header describing the stream name, type, number of channels, sampling rate, and data format
+- **Timestamps** - each sample is time-stamped automatically using LSL's built-in clock synchronization
 
 LSL uses a time synchronization protocol based on the Network Time Protocol (NTP) to align timestamps across different machines. This means that even if your timer GUI is running on one computer and your recording software is running on another, the event markers can be precisely aligned in time with other data streams such as physiological signals.
 
@@ -284,7 +284,7 @@ Make sure `timer_gui.py` is already running, then open a second PowerShell windo
 python -m pylsl.StreamViewer
 ```
 
-A window will open showing all active LSL streams on the network. Select `HRI_Timer_Events` from the list and click **Select**. You will see incoming markers displayed in real time as you interact with the timer GUI — for example, when you press Start on a timer or click an event button, the corresponding marker string will appear immediately in the StreamViewer window.
+A window will open showing all active LSL streams on the network. Select `HRI_Timer_Events` from the list and click **Select**. You will see incoming markers displayed in real time as you interact with the timer GUI, for example, when you press Start on a timer or click an event button, the corresponding marker string will appear immediately in the StreamViewer window.
 
 ### What to look for
 
@@ -328,11 +328,11 @@ This will print every marker with its precise timestamp, which you can then alig
 
 This section walks through the full process of loading your XDF file in MATLAB and viewing your event markers in a readable table.
 
-#### Step 1 — Download load_xdf
+#### Step 1 - Download load_xdf
 
 Download the `load_xdf.m` file from the [XDF MATLAB importer](https://github.com/xdf-modules/xdf-Matlab). On that page, click the green **Code** button and select **Download ZIP**. Extract the zip file somewhere easy to find, such as `C:\Users\YourName\Documents\xdf-Matlab`.
 
-#### Step 2 — Add load_xdf to your MATLAB path
+#### Step 2 - Add load_xdf to your MATLAB path
 
 Open MATLAB and run the following, replacing the path with wherever you extracted the file:
 
@@ -346,9 +346,9 @@ Confirm it worked by running:
 which load_xdf
 ```
 
-This should print the full path to the `load_xdf.m` file. If it prints nothing, the path in your `addpath` command is incorrect — double check the folder location in File Explorer.
+This should print the full path to the `load_xdf.m` file. If it prints nothing, the path in your `addpath` command is incorrect, double check the folder location in File Explorer.
 
-#### Step 3 — Load your XDF file
+#### Step 3 - Load your XDF file
 
 Use the file browser to select your XDF file without needing to type the path manually:
 
@@ -362,7 +362,7 @@ disp(length(streams))
 
 A file browser window will open. Navigate to your XDF recording file (saved by LabRecorder, usually in your Documents folder), select it, and click **Open**. MATLAB will print `File loaded successfully` and the number of streams found in the file.
 
-#### Step 4 — View your markers as a table
+#### Step 4 - View your markers as a table
 
 Run the following to display all event markers and their timestamps in a clean, readable table:
 
